@@ -34,9 +34,10 @@ export default function AssetDetailPage() {
   })
 
   const { data: employees, isLoading: loadingEmployees } = useQuery<{ items: Employee[] }>({
-    queryKey: ['employees-list-assign'],
-    queryFn: () => api.get('/employees?size=500').then(r => r.data),
+    queryKey: ['employees-for-assign', id],
+    queryFn: () => api.get('/employees?size=500&page=1').then(r => r.data),
     staleTime: 0,
+    gcTime: 0,
   })
 
   const { data: types } = useQuery<AssetType[]>({

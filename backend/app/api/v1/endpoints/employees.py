@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("", response_model=PaginatedResponse)
 def list_employees(
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
+    size: int = Query(20, ge=1, le=1000),
     search: str | None = None,
     department_id: str | None = None,
     status: str | None = None,
