@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from app.db.session import get_db
@@ -9,6 +9,14 @@ from app.models.models import AuthUser
 import math
 
 router = APIRouter()
+
+
+def serialize(d):
+    """Convert date/datetime objects to strings for JSON storage."""
+    if not d:
+        return d
+    return {k: v.isoformat() if isinstance(v, (date, datetime)) else v
+            for k, v in d.items()}
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -54,7 +62,7 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
         status="active",
     )
     db.add(assignment)
-
+    db.flush()
     # Update asset status
     asset.status = "assigned"
 
@@ -67,7 +75,7 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
         new_value={"employee_id": data.employee_id, "date": str(data.assigned_date)},
         note=data.reason,
     ))
-    db.add(AuditLog(user_id=user.id, table_name="asset_assignments", record_id=assignment.id, action="create", new_data=data.model_dump()))
+    db.add(AuditLog(user_id=user.id, table_name="asset_assignments", record_id=assignment.id, action="create", new_data=serialize(data.model_dump())))
 
     db.commit()
     db.refresh(assignment)
@@ -84,6 +92,9 @@ def return_assignment(assignment_id: str, data: AssignmentReturn, db: Session = 
     if assignment.status != "active":
         raise HTTPException(400, "Assignment is not active")
 
+    if data.returned_date < assignment.assigned_date:
+        raise HTTPException(400, "Ngày thu hồi không thể trước ngày bàn giao")
+    
     assignment.status = "returned"
     assignment.returned_date = data.returned_date
     assignment.return_reason = data.return_reason

@@ -92,7 +92,7 @@ export function Button({ children, onClick, variant = 'primary', size = 'md', di
 // ── Input ──────────────────────────────────────────────────────
 interface InputProps {
   label?: string; value: string; onChange: (v: string) => void
-  placeholder?: string; type?: string; required?: boolean
+  placeholder?: string; type?: string; required?: boolean; min?: string
 }
 
 export function Input({ label, value, onChange, placeholder, type = 'text', required }: InputProps) {

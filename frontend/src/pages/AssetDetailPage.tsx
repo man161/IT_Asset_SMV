@@ -34,9 +34,10 @@ export default function AssetDetailPage() {
   })
 
   const { data: employees, isLoading: loadingEmployees } = useQuery<{ items: Employee[] }>({
-    queryKey: ['employees-list-assign'],
-    queryFn: () => api.get('/employees?size=500').then(r => r.data),
+    queryKey: ['employees-for-assign', id],
+    queryFn: () => api.get('/employees?size=500&page=1').then(r => r.data),
     staleTime: 0,
+    gcTime: 0,
   })
 
   const { data: types } = useQuery<AssetType[]>({
@@ -355,7 +356,8 @@ export default function AssetDetailPage() {
           <form onSubmit={e => { e.preventDefault(); returnMutation.mutate(returnForm) }}
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Input label="Ngày thu hồi" value={returnForm.returned_date}
-              onChange={v => setReturnForm(p => ({ ...p, returned_date: v }))} type="date" required />
+              onChange={v => setReturnForm(p => ({ ...p, returned_date: v }))} type="date" required
+              min={activeAssignment?.assigned_date ?? ''} />
             <Input label="Lý do thu hồi" value={returnForm.return_reason}
               onChange={v => setReturnForm(p => ({ ...p, return_reason: v }))} placeholder="Nhân viên nghỉ việc..." />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
