@@ -92,6 +92,9 @@ def return_assignment(assignment_id: str, data: AssignmentReturn, db: Session = 
     if assignment.status != "active":
         raise HTTPException(400, "Assignment is not active")
 
+    if data.returned_date < assignment.assigned_date:
+        raise HTTPException(400, "Ngày thu hồi không thể trước ngày bàn giao")
+    
     assignment.status = "returned"
     assignment.returned_date = data.returned_date
     assignment.return_reason = data.return_reason

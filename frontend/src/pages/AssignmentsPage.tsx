@@ -26,7 +26,7 @@ export default function AssignmentsPage() {
 
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10 }}>
-          {['active', 'returned', 'revoked', ''].map(s => (
+          {['active', 'returned', ''].map(s => (
             <button key={s} onClick={() => { setFilterStatus(s); setPage(1) }} style={{
               padding: '6px 14px', borderRadius: 'var(--radius)',
               background: filterStatus === s ? 'var(--blue)' : 'var(--bg-3)',
@@ -34,7 +34,7 @@ export default function AssignmentsPage() {
               border: '1px solid', borderColor: filterStatus === s ? 'var(--blue)' : 'var(--border)',
               cursor: 'pointer', fontSize: 13, fontWeight: 500,
             }}>
-              {s === 'active' ? 'Đang dùng' : s === 'returned' ? 'Đã trả' : s === 'revoked' ? 'Thu hồi' : 'Tất cả'}
+              {s === 'active' ? 'Đang dùng' : s === 'returned' ? 'Đã trả' : 'Tất cả'}
             </button>
           ))}
         </div>
