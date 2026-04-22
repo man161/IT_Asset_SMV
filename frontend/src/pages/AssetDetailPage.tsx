@@ -356,7 +356,8 @@ export default function AssetDetailPage() {
           <form onSubmit={e => { e.preventDefault(); returnMutation.mutate(returnForm) }}
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Input label="Ngày thu hồi" value={returnForm.returned_date}
-              onChange={v => setReturnForm(p => ({ ...p, returned_date: v }))} type="date" required />
+              onChange={v => setReturnForm(p => ({ ...p, returned_date: v }))} type="date" required
+              min={activeAssignment?.assigned_date ?? ''} />
             <Input label="Lý do thu hồi" value={returnForm.return_reason}
               onChange={v => setReturnForm(p => ({ ...p, return_reason: v }))} placeholder="Nhân viên nghỉ việc..." />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
