@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { AssetAssignment, PaginatedResponse } from '../types'
-import { PageHeader, Card, Table, Tr, Td, Badge, Pagination, Spinner, SearchInput } from '../components/ui'
+import { PageHeader, Card, Table, Tr, Td, Badge, Pagination, Spinner } from '../components/ui'
 import { format } from 'date-fns'
 
 export default function AssignmentsPage() {
@@ -20,22 +20,27 @@ export default function AssignmentsPage() {
     },
   })
 
+  // Bỏ tab "Thu hồi" (revoked) vì không có flow tạo ra trạng thái này
+  const TABS = [
+    { key: 'active',   label: 'Đang dùng' },
+    { key: 'returned', label: 'Đã trả' },
+    { key: '',         label: 'Tất cả' },
+  ]
+
   return (
     <div>
       <PageHeader title="Bàn giao" subtitle={`${data?.total ?? 0} bản ghi`} />
 
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10 }}>
-          {['active', 'returned', ''].map(s => (
-            <button key={s} onClick={() => { setFilterStatus(s); setPage(1) }} style={{
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => { setFilterStatus(t.key); setPage(1) }} style={{
               padding: '6px 14px', borderRadius: 'var(--radius)',
-              background: filterStatus === s ? 'var(--blue)' : 'var(--bg-3)',
-              color: filterStatus === s ? '#fff' : 'var(--text-2)',
-              border: '1px solid', borderColor: filterStatus === s ? 'var(--blue)' : 'var(--border)',
+              background: filterStatus === t.key ? 'var(--blue)' : 'var(--bg-3)',
+              color: filterStatus === t.key ? '#fff' : 'var(--text-2)',
+              border: '1px solid', borderColor: filterStatus === t.key ? 'var(--blue)' : 'var(--border)',
               cursor: 'pointer', fontSize: 13, fontWeight: 500,
-            }}>
-              {s === 'active' ? 'Đang dùng' : s === 'returned' ? 'Đã trả' : 'Tất cả'}
-            </button>
+            }}>{t.label}</button>
           ))}
         </div>
       </Card>
@@ -48,9 +53,7 @@ export default function AssignmentsPage() {
           >
             {data?.items.map(a => (
               <Tr key={a.id}>
-                <Td mono>
-                  <span style={{ fontSize: 11 }}>{a.handover_code}</span>
-                </Td>
+                <Td mono><span style={{ fontSize: 12 }}>{a.handover_code}</span></Td>
                 <Td>
                   <div style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--blue)' }}
                     onClick={() => navigate(`/assets/${a.asset_id}`)}>

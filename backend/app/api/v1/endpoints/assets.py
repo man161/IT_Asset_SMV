@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_
 from app.db.session import get_db
-from app.models.models import Asset, AssetAssignment, AuditLog
+from app.models.models import Asset, AssetAssignment, AuditLog, AssetEvent
 from app.schemas.schemas import AssetCreate, AssetUpdate, AssetOut, AssetWithAssignee, PaginatedResponse
 from app.core.deps import get_current_user, get_admin_user
 from app.models.models import AuthUser
@@ -137,3 +137,70 @@ def warranty_expiring(days: int = 30, db: Session = Depends(get_db), _: AuthUser
         Asset.deleted_at.is_(None)
     ).all()
     return assets
+
+
+@router.get("/stats/warranty-expired")
+def warranty_expired(db: Session = Depends(get_db), _: AuthUser = Depends(get_current_user)):
+    assets = db.query(Asset).filter(
+        Asset.warranty_expiry < datetime.utcnow().date(),
+        Asset.deleted_at.is_(None)
+    ).all()
+    return assets
+
+# ── Maintenance ───────────────────────────────────────────────
+from pydantic import BaseModel as _BaseModel
+from typing import Optional as _Optional
+
+class MaintenanceIn(_BaseModel):
+    note: _Optional[str] = None
+    expected_return: _Optional[str] = None  # date string
+
+
+@router.post("/{asset_id}/send-maintenance")
+def send_to_maintenance(asset_id: str, data: MaintenanceIn, db: Session = Depends(get_db), user: AuthUser = Depends(get_admin_user)):
+    asset = db.query(Asset).filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+    if not asset:
+        raise HTTPException(404, "Asset not found")
+    if asset.status == "maintenance":
+        raise HTTPException(400, "Tài sản đang trong bảo trì")
+
+    old_status = asset.status
+    asset.status = "maintenance"
+    db.add(AssetEvent(
+        asset_id=asset_id, performed_by=user.id,
+        action="maintenance_start",
+        old_value={"status": old_status},
+        new_value={"status": "maintenance", "note": data.note, "expected_return": data.expected_return},
+        note=data.note,
+    ))
+    db.commit()
+    return {"message": "Đã gửi bảo trì", "asset_id": asset_id}
+
+
+@router.post("/{asset_id}/complete-maintenance")
+def complete_maintenance(asset_id: str, db: Session = Depends(get_db), user: AuthUser = Depends(get_admin_user)):
+    asset = db.query(Asset).filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+    if not asset:
+        raise HTTPException(404, "Asset not found")
+    if asset.status != "maintenance":
+        raise HTTPException(400, "Tài sản không trong trạng thái bảo trì")
+
+    # Kiểm tra xem có assignment active không (bảo trì trong khi vẫn đang bàn giao)
+    active_assignment = db.query(AssetAssignment).filter(
+        AssetAssignment.asset_id == asset_id,
+        AssetAssignment.status == "active"
+    ).first()
+
+    # Trả về đúng trạng thái: assigned nếu còn người dùng, available nếu không
+    new_status = "assigned" if active_assignment else "available"
+    asset.status = new_status
+
+    db.add(AssetEvent(
+        asset_id=asset_id, performed_by=user.id,
+        action="maintenance_done",
+        old_value={"status": "maintenance"},
+        new_value={"status": new_status},
+        note="Hoàn thành bảo trì",
+    ))
+    db.commit()
+    return {"message": "Hoàn thành bảo trì", "asset_id": asset_id}

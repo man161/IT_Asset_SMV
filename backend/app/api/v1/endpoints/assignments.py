@@ -2,7 +2,7 @@ from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from app.db.session import get_db
-from app.models.models import AssetAssignment, Asset, AssetEvent, AuditLog
+from app.models.models import AssetAssignment, Asset, AssetEvent, AuditLog, Employee, AssetLogin
 from app.schemas.schemas import AssignmentCreate, AssignmentReturn, AssignmentOut, PaginatedResponse
 from app.core.deps import get_current_user, get_admin_user
 from app.models.models import AuthUser
@@ -50,8 +50,22 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
     asset = db.query(Asset).filter(Asset.id == data.asset_id, Asset.deleted_at.is_(None)).first()
     if not asset:
         raise HTTPException(404, "Asset not found")
-    if asset.status != "available":
-        raise HTTPException(400, f"Asset is currently '{asset.status}', not available")
+    if asset.status not in ("available", "maintenance"):
+        raise HTTPException(400, f"Tài sản đang ở trạng thái '{asset.status}', không thể bàn giao")
+
+    # Generate sequential handover code — dùng MAX để tránh trùng
+    from sqlalchemy import func as sqlfunc
+    last = db.query(sqlfunc.max(AssetAssignment.handover_code)).filter(
+        AssetAssignment.handover_code.like('SMVITBG-%')
+    ).scalar()
+    if last:
+        try:
+            last_num = int(last.split('-')[1])
+        except (IndexError, ValueError):
+            last_num = 0
+    else:
+        last_num = 0
+    handover_code = f"SMVITBG-{last_num + 1:06d}"
 
     assignment = AssetAssignment(
         asset_id=data.asset_id,
@@ -60,13 +74,28 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
         assigned_date=data.assigned_date,
         reason=data.reason,
         status="active",
+        handover_code=handover_code,
     )
     db.add(assignment)
-    db.flush()
-    # Update asset status
+    db.flush()  # generate ID before audit log
+
     asset.status = "assigned"
 
-    # Log event
+    # Tự động thêm tài khoản đăng nhập từ mã nhân viên (nếu chưa có)
+    employee = db.query(Employee).filter(Employee.id == data.employee_id).first()
+    if employee:
+        existing_login = db.query(AssetLogin).filter(
+            AssetLogin.asset_id == data.asset_id,
+            AssetLogin.username == employee.employee_code
+        ).first()
+        if not existing_login:
+            db.add(AssetLogin(
+                asset_id=data.asset_id,
+                username=employee.employee_code,
+                note=f"Tự động từ bàn giao — {employee.full_name}",
+                created_by=user.id,
+            ))
+
     db.add(AssetEvent(
         asset_id=data.asset_id,
         employee_id=data.employee_id,
@@ -75,7 +104,8 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
         new_value={"employee_id": data.employee_id, "date": str(data.assigned_date)},
         note=data.reason,
     ))
-    db.add(AuditLog(user_id=user.id, table_name="asset_assignments", record_id=assignment.id, action="create", new_data=serialize(data.model_dump())))
+    db.add(AuditLog(user_id=user.id, table_name="asset_assignments", record_id=assignment.id,
+                    action="create", new_data=serialize(data.model_dump())))
 
     db.commit()
     db.refresh(assignment)
@@ -92,9 +122,10 @@ def return_assignment(assignment_id: str, data: AssignmentReturn, db: Session = 
     if assignment.status != "active":
         raise HTTPException(400, "Assignment is not active")
 
+    # Validate returned_date >= assigned_date
     if data.returned_date < assignment.assigned_date:
-        raise HTTPException(400, "Ngày thu hồi không thể trước ngày bàn giao")
-    
+        raise HTTPException(400, f"Ngày thu hồi ({data.returned_date}) không thể trước ngày bàn giao ({assignment.assigned_date})")
+
     assignment.status = "returned"
     assignment.returned_date = data.returned_date
     assignment.return_reason = data.return_reason
