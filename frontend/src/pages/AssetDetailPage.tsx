@@ -193,10 +193,10 @@ export default function AssetDetailPage() {
           <div style={{ display: 'flex', gap: 8 }}>
             <Button variant="ghost" onClick={openEditAsset}>✏ Chỉnh sửa</Button>
             {asset.status === 'available' && (
-              <>
-                <Button onClick={() => setShowAssign(true)}>⇄ Bàn giao</Button>
-                <Button variant="ghost" onClick={() => setShowMaintenance(true)}>⚙ Bảo trì</Button>
-              </>
+              <Button onClick={() => setShowAssign(true)}>⇄ Bàn giao</Button>
+            )}
+            {(asset.status === 'available' || asset.status === 'assigned') && (
+              <Button variant="ghost" onClick={() => setShowMaintenance(true)}>⚙ Bảo trì</Button>
             )}
             {asset.status === 'assigned' && activeAssignment && (
               <Button variant="ghost" onClick={() => setShowReturn(true)}>↩ Thu hồi</Button>
@@ -434,6 +434,11 @@ export default function AssetDetailPage() {
         <Modal title="Gửi tài sản bảo trì" onClose={() => setShowMaintenance(false)}>
           <form onSubmit={e => { e.preventDefault(); maintenanceMutation.mutate(maintenanceForm) }}
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {asset.status === 'assigned' && activeAssignment && (
+              <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--amber-dim)', fontSize: 12, color: 'var(--amber)' }}>
+                ⚠ Tài sản đang được dùng bởi <b>{(asset as any).current_assignee?.full_name}</b>. Hệ thống sẽ tự động thu hồi và ghi nhận ngày hôm nay.
+              </div>
+            )}
             <Input label="Mô tả vấn đề / Lý do bảo trì" value={maintenanceForm.note}
               onChange={v => setMaintenanceForm(p => ({ ...p, note: v }))} placeholder="Màn hình bị hỏng, thay pin..." />
             <Input label="Ngày dự kiến trả về" value={maintenanceForm.expected_return}

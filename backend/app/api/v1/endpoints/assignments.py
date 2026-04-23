@@ -2,7 +2,7 @@ from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from app.db.session import get_db
-from app.models.models import AssetAssignment, Asset, AssetEvent, AuditLog
+from app.models.models import AssetAssignment, Asset, AssetEvent, AuditLog, Employee, AssetLogin
 from app.schemas.schemas import AssignmentCreate, AssignmentReturn, AssignmentOut, PaginatedResponse
 from app.core.deps import get_current_user, get_admin_user
 from app.models.models import AuthUser
@@ -71,6 +71,21 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
     db.flush()  # generate ID before audit log
 
     asset.status = "assigned"
+
+    # Tự động thêm tài khoản đăng nhập từ mã nhân viên (nếu chưa có)
+    employee = db.query(Employee).filter(Employee.id == data.employee_id).first()
+    if employee:
+        existing_login = db.query(AssetLogin).filter(
+            AssetLogin.asset_id == data.asset_id,
+            AssetLogin.username == employee.employee_code
+        ).first()
+        if not existing_login:
+            db.add(AssetLogin(
+                asset_id=data.asset_id,
+                username=employee.employee_code,
+                note=f"Tự động từ bàn giao — {employee.full_name}",
+                created_by=user.id,
+            ))
 
     db.add(AssetEvent(
         asset_id=data.asset_id,

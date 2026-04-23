@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_
 from app.db.session import get_db
-from app.models.models import Asset, AssetAssignment, AuditLog
+from app.models.models import Asset, AssetAssignment, AuditLog, AssetEvent
 from app.schemas.schemas import AssetCreate, AssetUpdate, AssetOut, AssetWithAssignee, PaginatedResponse
 from app.core.deps import get_current_user, get_admin_user
 from app.models.models import AuthUser
@@ -161,10 +161,28 @@ def send_to_maintenance(asset_id: str, data: MaintenanceIn, db: Session = Depend
     asset = db.query(Asset).filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
     if not asset:
         raise HTTPException(404, "Asset not found")
-    if asset.status == "assigned":
-        raise HTTPException(400, "Thu hồi tài sản trước khi gửi bảo trì")
     if asset.status == "maintenance":
         raise HTTPException(400, "Tài sản đang trong bảo trì")
+
+    # Nếu đang assigned thì tự động thu hồi trước
+    if asset.status == "assigned":
+        active = db.query(AssetAssignment).filter(
+            AssetAssignment.asset_id == asset_id,
+            AssetAssignment.status == "active"
+        ).first()
+        if active:
+            from datetime import date
+            active.status = "returned"
+            active.returned_date = date.today()
+            active.return_reason = f"Gửi bảo trì: {data.note or ''}"
+            db.add(AssetEvent(
+                asset_id=asset_id, employee_id=active.employee_id,
+                performed_by=user.id, action="return",
+                old_value={"status": "assigned"},
+                new_value={"status": "maintenance", "auto_returned": True},
+                note=f"Tự động thu hồi để gửi bảo trì",
+            ))
+
     old_status = asset.status
     asset.status = "maintenance"
     db.add(AssetEvent(
