@@ -18,6 +18,9 @@ export default function AssetDetailPage() {
   const [showReturn, setShowReturn] = useState(false)
   const [showEditAsset, setShowEditAsset] = useState(false)
   const [showAddLogin, setShowAddLogin] = useState(false)
+  const [showMaintenance, setShowMaintenance] = useState(false)
+  const [searchEmployee, setSearchEmployee] = useState('')
+  const [maintenanceForm, setMaintenanceForm] = useState({ note: '', expected_return: '' })
 
   const [assignForm, setAssignForm] = useState({ employee_id: '', assigned_date: '', reason: '' })
   const [returnForm, setReturnForm] = useState({ returned_date: '', return_reason: '' })
@@ -145,6 +148,28 @@ export default function AssetDetailPage() {
     onSuccess: () => { refetchLogins(); toast.success('Đã xoá') },
   })
 
+  const maintenanceMutation = useMutation({
+    mutationFn: (d: typeof maintenanceForm) => api.post(`/assets/${id}/send-maintenance`, d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['asset', id] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success('Đã gửi bảo trì')
+      setShowMaintenance(false)
+      setMaintenanceForm({ note: '', expected_return: '' })
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail ?? 'Lỗi'),
+  })
+
+  const completeMaintMutation = useMutation({
+    mutationFn: () => api.post(`/assets/${id}/complete-maintenance`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['asset', id] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success('Hoàn thành bảo trì — tài sản đã về kho')
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail ?? 'Lỗi'),
+  })
+
   const ef = (k: string) => (v: string) => setEditForm((p: any) => ({ ...p, [k]: v }))
 
   if (isLoading) return <Spinner />
@@ -167,8 +192,21 @@ export default function AssetDetailPage() {
         {user?.is_admin && (
           <div style={{ display: 'flex', gap: 8 }}>
             <Button variant="ghost" onClick={openEditAsset}>✏ Chỉnh sửa</Button>
-            {asset.status === 'available' && <Button onClick={() => setShowAssign(true)}>⇄ Bàn giao</Button>}
-            {asset.status === 'assigned' && <Button variant="ghost" onClick={() => setShowReturn(true)}>↩ Thu hồi</Button>}
+            {asset.status === 'available' && (
+              <Button onClick={() => setShowAssign(true)}>⇄ Bàn giao</Button>
+            )}
+            {(asset.status === 'available' || asset.status === 'assigned') && (
+              <Button variant="ghost" onClick={() => setShowMaintenance(true)}>⚙ Bảo trì</Button>
+            )}
+            {asset.status === 'assigned' && activeAssignment && (
+              <Button variant="ghost" onClick={() => setShowReturn(true)}>↩ Thu hồi</Button>
+            )}
+            {asset.status === 'maintenance' && (
+              <Button onClick={() => { if (confirm('Xác nhận hoàn thành bảo trì?')) completeMaintMutation.mutate() }}
+                disabled={completeMaintMutation.isPending}>
+                ✓ Hoàn thành bảo trì
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -318,21 +356,41 @@ export default function AssetDetailPage() {
 
       {/* ── Assign Modal ── */}
       {showAssign && (
-        <Modal title="Bàn giao tài sản" onClose={() => setShowAssign(false)}>
+        <Modal title="Bàn giao tài sản" onClose={() => { setShowAssign(false); setSearchEmployee('') }}>
           <form onSubmit={e => { e.preventDefault(); assignMutation.mutate(assignForm) }}
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)' }}>
                 Nhân viên nhận <span style={{ color: 'var(--red)' }}>*</span>
               </span>
+              <input
+                value={searchEmployee}
+                onChange={e => setSearchEmployee(e.target.value)}
+                placeholder="Tìm nhanh tên nhân viên..."
+                style={{
+                  background: 'var(--bg-3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)', padding: '7px 11px',
+                  color: 'var(--text-1)', fontSize: 13.5, outline: 'none', width: '100%',
+                }}
+              />
               <select value={assignForm.employee_id}
                 onChange={e => setAssignForm(p => ({ ...p, employee_id: e.target.value }))}
-                required
-                style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 11px', color: 'var(--text-1)', fontSize: 13.5, outline: 'none' }}>
+                required size={5}
+                style={{
+                  background: 'var(--bg-3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)', padding: '4px',
+                  color: 'var(--text-1)', fontSize: 13.5, outline: 'none', height: 130,
+                }}>
                 <option value="">{loadingEmployees ? 'Đang tải...' : '— Chọn nhân viên —'}</option>
-                {(employees?.items ?? []).map(e => (
-                  <option key={e.id} value={e.id}>{e.full_name} — {e.employee_code}</option>
-                ))}
+                {(employees?.items ?? [])
+                  .filter(e =>
+                    searchEmployee === '' ||
+                    e.full_name.toLowerCase().includes(searchEmployee.toLowerCase()) ||
+                    e.employee_code.toLowerCase().includes(searchEmployee.toLowerCase())
+                  )
+                  .map(e => (
+                    <option key={e.id} value={e.id}>{e.full_name} — {e.employee_code}</option>
+                  ))}
               </select>
               {!loadingEmployees && (employees?.items ?? []).length === 0 && (
                 <span style={{ fontSize: 11, color: 'var(--amber)' }}>Chưa có nhân viên — vào trang Nhân viên để thêm trước</span>
@@ -343,7 +401,7 @@ export default function AssetDetailPage() {
             <Input label="Lý do / Ghi chú" value={assignForm.reason}
               onChange={v => setAssignForm(p => ({ ...p, reason: v }))} placeholder="Phục vụ công việc..." />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <Button variant="ghost" onClick={() => setShowAssign(false)}>Hủy</Button>
+              <Button variant="ghost" onClick={() => { setShowAssign(false); setSearchEmployee('') }}>Hủy</Button>
               <Button type="submit" disabled={assignMutation.isPending}>Xác nhận bàn giao</Button>
             </div>
           </form>
@@ -355,6 +413,9 @@ export default function AssetDetailPage() {
         <Modal title="Thu hồi tài sản" onClose={() => setShowReturn(false)}>
           <form onSubmit={e => { e.preventDefault(); returnMutation.mutate(returnForm) }}
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', background: 'var(--bg-3)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
+              Ngày bàn giao: <b>{activeAssignment ? format(new Date(activeAssignment.assigned_date), 'dd/MM/yyyy') : '—'}</b>
+            </div>
             <Input label="Ngày thu hồi" value={returnForm.returned_date}
               onChange={v => setReturnForm(p => ({ ...p, returned_date: v }))} type="date" required
               min={activeAssignment?.assigned_date ?? ''} />
@@ -363,6 +424,30 @@ export default function AssetDetailPage() {
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <Button variant="ghost" onClick={() => setShowReturn(false)}>Hủy</Button>
               <Button type="submit" variant="danger" disabled={returnMutation.isPending}>Xác nhận thu hồi</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Maintenance Modal ── */}
+      {showMaintenance && (
+        <Modal title="Gửi tài sản bảo trì" onClose={() => setShowMaintenance(false)}>
+          <form onSubmit={e => { e.preventDefault(); maintenanceMutation.mutate(maintenanceForm) }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {asset.status === 'assigned' && activeAssignment && (
+              <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--amber-dim)', fontSize: 12, color: 'var(--amber)' }}>
+                ⚠ Tài sản đang được dùng bởi <b>{(asset as any).current_assignee?.full_name}</b>. Hệ thống sẽ tự động thu hồi và ghi nhận ngày hôm nay.
+              </div>
+            )}
+            <Input label="Mô tả vấn đề / Lý do bảo trì" value={maintenanceForm.note}
+              onChange={v => setMaintenanceForm(p => ({ ...p, note: v }))} placeholder="Màn hình bị hỏng, thay pin..." />
+            <Input label="Ngày dự kiến trả về" value={maintenanceForm.expected_return}
+              onChange={v => setMaintenanceForm(p => ({ ...p, expected_return: v }))} type="date" />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <Button variant="ghost" onClick={() => setShowMaintenance(false)}>Hủy</Button>
+              <Button type="submit" disabled={maintenanceMutation.isPending} style={{ background: 'var(--amber)', borderColor: 'var(--amber)' }}>
+                {maintenanceMutation.isPending ? 'Đang gửi...' : '⚙ Xác nhận gửi bảo trì'}
+              </Button>
             </div>
           </form>
         </Modal>

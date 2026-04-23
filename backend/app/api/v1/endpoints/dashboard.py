@@ -12,16 +12,23 @@ router = APIRouter()
 
 @router.get("", response_model=DashboardStats)
 def get_stats(db: Session = Depends(get_db), _: AuthUser = Depends(get_current_user)):
-    total_assets = db.query(Asset).filter(Asset.deleted_at.is_(None)).count()
-    available = db.query(Asset).filter(Asset.status == "available", Asset.deleted_at.is_(None)).count()
-    assigned = db.query(Asset).filter(Asset.status == "assigned", Asset.deleted_at.is_(None)).count()
-    maintenance = db.query(Asset).filter(Asset.status == "maintenance", Asset.deleted_at.is_(None)).count()
+    today = datetime.utcnow().date()
+    cutoff_30 = today + timedelta(days=30)
+
+    total_assets    = db.query(Asset).filter(Asset.deleted_at.is_(None)).count()
+    available       = db.query(Asset).filter(Asset.status == "available", Asset.deleted_at.is_(None)).count()
+    assigned        = db.query(Asset).filter(Asset.status == "assigned",  Asset.deleted_at.is_(None)).count()
+    maintenance     = db.query(Asset).filter(Asset.status == "maintenance", Asset.deleted_at.is_(None)).count()
     total_employees = db.query(Employee).filter(Employee.status == "active").count()
-    active_assignments = db.query(AssetAssignment).filter(AssetAssignment.status == "active").count()
-    cutoff = datetime.utcnow().date() + timedelta(days=30)
+
     warranty_expiring = db.query(Asset).filter(
-        Asset.warranty_expiry <= cutoff,
-        Asset.warranty_expiry >= datetime.utcnow().date(),
+        Asset.warranty_expiry <= cutoff_30,
+        Asset.warranty_expiry >= today,
+        Asset.deleted_at.is_(None),
+    ).count()
+
+    warranty_expired = db.query(Asset).filter(
+        Asset.warranty_expiry < today,
         Asset.deleted_at.is_(None),
     ).count()
 
@@ -31,6 +38,6 @@ def get_stats(db: Session = Depends(get_db), _: AuthUser = Depends(get_current_u
         assigned_assets=assigned,
         maintenance_assets=maintenance,
         total_employees=total_employees,
-        active_assignments=active_assignments,
         warranty_expiring_soon=warranty_expiring,
+        warranty_expired=warranty_expired,
     )
