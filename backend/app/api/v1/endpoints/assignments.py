@@ -50,13 +50,22 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
     asset = db.query(Asset).filter(Asset.id == data.asset_id, Asset.deleted_at.is_(None)).first()
     if not asset:
         raise HTTPException(404, "Asset not found")
-    if asset.status != "available":
-        raise HTTPException(400, f"Asset is currently '{asset.status}', not available")
+    if asset.status not in ("available", "maintenance"):
+        raise HTTPException(400, f"Tài sản đang ở trạng thái '{asset.status}', không thể bàn giao")
 
-    # Generate sequential handover code
+    # Generate sequential handover code — dùng MAX để tránh trùng
     from sqlalchemy import func as sqlfunc
-    count = db.query(sqlfunc.count(AssetAssignment.id)).scalar() + 1
-    handover_code = f"SMVITBG-{count:06d}"
+    last = db.query(sqlfunc.max(AssetAssignment.handover_code)).filter(
+        AssetAssignment.handover_code.like('SMVITBG-%')
+    ).scalar()
+    if last:
+        try:
+            last_num = int(last.split('-')[1])
+        except (IndexError, ValueError):
+            last_num = 0
+    else:
+        last_num = 0
+    handover_code = f"SMVITBG-{last_num + 1:06d}"
 
     assignment = AssetAssignment(
         asset_id=data.asset_id,

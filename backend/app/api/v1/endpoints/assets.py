@@ -164,25 +164,6 @@ def send_to_maintenance(asset_id: str, data: MaintenanceIn, db: Session = Depend
     if asset.status == "maintenance":
         raise HTTPException(400, "Tài sản đang trong bảo trì")
 
-    # Nếu đang assigned thì tự động thu hồi trước
-    if asset.status == "assigned":
-        active = db.query(AssetAssignment).filter(
-            AssetAssignment.asset_id == asset_id,
-            AssetAssignment.status == "active"
-        ).first()
-        if active:
-            from datetime import date
-            active.status = "returned"
-            active.returned_date = date.today()
-            active.return_reason = f"Gửi bảo trì: {data.note or ''}"
-            db.add(AssetEvent(
-                asset_id=asset_id, employee_id=active.employee_id,
-                performed_by=user.id, action="return",
-                old_value={"status": "assigned"},
-                new_value={"status": "maintenance", "auto_returned": True},
-                note=f"Tự động thu hồi để gửi bảo trì",
-            ))
-
     old_status = asset.status
     asset.status = "maintenance"
     db.add(AssetEvent(
@@ -203,12 +184,22 @@ def complete_maintenance(asset_id: str, db: Session = Depends(get_db), user: Aut
         raise HTTPException(404, "Asset not found")
     if asset.status != "maintenance":
         raise HTTPException(400, "Tài sản không trong trạng thái bảo trì")
-    asset.status = "available"
+
+    # Kiểm tra xem có assignment active không (bảo trì trong khi vẫn đang bàn giao)
+    active_assignment = db.query(AssetAssignment).filter(
+        AssetAssignment.asset_id == asset_id,
+        AssetAssignment.status == "active"
+    ).first()
+
+    # Trả về đúng trạng thái: assigned nếu còn người dùng, available nếu không
+    new_status = "assigned" if active_assignment else "available"
+    asset.status = new_status
+
     db.add(AssetEvent(
         asset_id=asset_id, performed_by=user.id,
         action="maintenance_done",
         old_value={"status": "maintenance"},
-        new_value={"status": "available"},
+        new_value={"status": new_status},
         note="Hoàn thành bảo trì",
     ))
     db.commit()
