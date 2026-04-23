@@ -53,6 +53,11 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
     if asset.status != "available":
         raise HTTPException(400, f"Asset is currently '{asset.status}', not available")
 
+    # Generate sequential handover code
+    from sqlalchemy import func as sqlfunc
+    count = db.query(sqlfunc.count(AssetAssignment.id)).scalar() + 1
+    handover_code = f"SMVITBG-{count:06d}"
+
     assignment = AssetAssignment(
         asset_id=data.asset_id,
         employee_id=data.employee_id,
@@ -60,13 +65,13 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
         assigned_date=data.assigned_date,
         reason=data.reason,
         status="active",
+        handover_code=handover_code,
     )
     db.add(assignment)
-    db.flush()
-    # Update asset status
+    db.flush()  # generate ID before audit log
+
     asset.status = "assigned"
 
-    # Log event
     db.add(AssetEvent(
         asset_id=data.asset_id,
         employee_id=data.employee_id,
@@ -75,7 +80,8 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
         new_value={"employee_id": data.employee_id, "date": str(data.assigned_date)},
         note=data.reason,
     ))
-    db.add(AuditLog(user_id=user.id, table_name="asset_assignments", record_id=assignment.id, action="create", new_data=serialize(data.model_dump())))
+    db.add(AuditLog(user_id=user.id, table_name="asset_assignments", record_id=assignment.id,
+                    action="create", new_data=serialize(data.model_dump())))
 
     db.commit()
     db.refresh(assignment)
@@ -92,9 +98,10 @@ def return_assignment(assignment_id: str, data: AssignmentReturn, db: Session = 
     if assignment.status != "active":
         raise HTTPException(400, "Assignment is not active")
 
+    # Validate returned_date >= assigned_date
     if data.returned_date < assignment.assigned_date:
-        raise HTTPException(400, "Ngày thu hồi không thể trước ngày bàn giao")
-    
+        raise HTTPException(400, f"Ngày thu hồi ({data.returned_date}) không thể trước ngày bàn giao ({assignment.assigned_date})")
+
     assignment.status = "returned"
     assignment.returned_date = data.returned_date
     assignment.return_reason = data.return_reason

@@ -141,7 +141,7 @@ class AssetBase(BaseModel):
     wifi_mac: Optional[str] = None
     # Purchase & Warranty
     purchase_date: Optional[date] = None
-    #purchase_price: Optional[float] = None
+    purchase_price: Optional[float] = None
     warranty_expiry: Optional[date] = None
     location_id: Optional[str] = None
     specs: Optional[dict[str, Any]] = None
@@ -225,5 +225,5 @@ class DashboardStats(BaseModel):
     assigned_assets: int
     maintenance_assets: int
     total_employees: int
-    active_assignments: int
-    warranty_expiring_soon: int  # trong 30 ngày
+    warranty_expiring_soon: int  # sắp hết trong 30 ngày
+    warranty_expired: int        # đã hết hạn bảo hành
