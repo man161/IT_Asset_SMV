@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, assets, employees, assignments, catalog, dashboard, asset_logins
+from app.api.v1.endpoints import auth, assets, employees, assignments, catalog, dashboard, asset_logins, import_excel
 
 api_router = APIRouter()
 api_router.include_router(auth.router,           prefix="/auth",        tags=["Auth"])
@@ -9,3 +9,4 @@ api_router.include_router(asset_logins.router,   prefix="/assets",      tags=["A
 api_router.include_router(employees.router,      prefix="/employees",   tags=["Employees"])
 api_router.include_router(assignments.router,    prefix="/assignments",  tags=["Assignments"])
 api_router.include_router(catalog.router,        prefix="/catalog",     tags=["Catalog"])
+api_router.include_router(import_excel.router,   prefix="/import",      tags=["Import"])

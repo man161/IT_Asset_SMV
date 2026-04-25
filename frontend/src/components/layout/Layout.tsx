@@ -7,6 +7,7 @@ const NAV = [
   { to: '/employees',   icon: '◉',  label: 'Nhân viên' },
   { to: '/assignments', icon: '⇄',  label: 'Bàn giao' },
   { to: '/catalog',     icon: '≡',  label: 'Danh mục' },
+  { to: '/import',      icon: '↑',  label: 'Import Excel' },
 ]
 
 export default function Layout() {

@@ -77,24 +77,20 @@ def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db), use
         handover_code=handover_code,
     )
     db.add(assignment)
-    db.flush()  # generate ID before audit log
+    db.flush()
 
     asset.status = "assigned"
 
-    # Tự động thêm tài khoản đăng nhập từ mã nhân viên (nếu chưa có)
+    # Xóa toàn bộ login cũ, thêm mới từ nhân viên được bàn giao
+    db.query(AssetLogin).filter(AssetLogin.asset_id == data.asset_id).delete()
     employee = db.query(Employee).filter(Employee.id == data.employee_id).first()
     if employee:
-        existing_login = db.query(AssetLogin).filter(
-            AssetLogin.asset_id == data.asset_id,
-            AssetLogin.username == employee.employee_code
-        ).first()
-        if not existing_login:
-            db.add(AssetLogin(
-                asset_id=data.asset_id,
-                username=employee.employee_code,
-                note=f"Tự động từ bàn giao — {employee.full_name}",
-                created_by=user.id,
-            ))
+        db.add(AssetLogin(
+            asset_id=data.asset_id,
+            username=employee.employee_code,
+            note=f"Tự động từ bàn giao — {employee.full_name}",
+            created_by=user.id,
+        ))
 
     db.add(AssetEvent(
         asset_id=data.asset_id,
