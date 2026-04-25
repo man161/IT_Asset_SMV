@@ -139,6 +139,7 @@ class AssetBase(BaseModel):
     # Network
     mac_address: Optional[str] = None
     wifi_mac: Optional[str] = None
+    vendor: Optional[str] = None
     # Purchase & Warranty
     purchase_date: Optional[date] = None
     purchase_price: Optional[float] = None
@@ -162,8 +163,9 @@ class AssetUpdate(BaseModel):
     office_version: Optional[str] = None
     mac_address: Optional[str] = None
     wifi_mac: Optional[str] = None
+    vendor: Optional[str] = None
     purchase_date: Optional[date] = None
-    #purchase_price: Optional[float] = None
+    purchase_price: Optional[float] = None
     warranty_expiry: Optional[date] = None
     location_id: Optional[str] = None
     specs: Optional[dict[str, Any]] = None

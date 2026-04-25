@@ -132,9 +132,11 @@ class Asset(Base):
     # Network
     mac_address: Mapped[str | None] = mapped_column(String)           # Ethernet MAC
     wifi_mac: Mapped[str | None] = mapped_column(String)              # WiFi MAC
+    # Purchase
+    vendor: Mapped[str | None] = mapped_column(String)                # Nhà cung cấp
     # Purchase & Warranty
     purchase_date: Mapped[datetime | None] = mapped_column(Date)
-    #purchase_price: Mapped[float | None] = mapped_column(Numeric(15, 2))
+    purchase_price: Mapped[float | None] = mapped_column(Numeric(15, 2))
     warranty_expiry: Mapped[datetime | None] = mapped_column(Date)
     location_id: Mapped[str | None] = mapped_column(ForeignKey("locations.id"))
     specs: Mapped[dict | None] = mapped_column(JSON)                  # CPU, RAM, Storage, GPU...

@@ -10,6 +10,7 @@ import EmployeesPage from './pages/EmployeesPage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import AssignmentsPage from './pages/AssignmentsPage'
 import CatalogPage from './pages/CatalogPage'
+import ImportPage from './pages/ImportPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="employees/:id" element={<EmployeeDetailPage />} />
         <Route path="assignments" element={<AssignmentsPage />} />
         <Route path="catalog" element={<CatalogPage />} />
+        <Route path="import" element={<ImportPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

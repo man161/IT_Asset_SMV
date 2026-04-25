@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 from app.db.session import get_db
 from app.models.models import Department, Location, AssetType, BusinessUnit
 from app.schemas.schemas import (
     DepartmentCreate, DepartmentOut, DepartmentUpdate,
     LocationCreate, LocationOut,
     AssetTypeCreate, AssetTypeOut,
-    BusinessUnitCreate, BusinessUnitOut,
+    BusinessUnitCreate, BusinessUnitOut, BusinessUnitUpdate,
 )
 from app.core.deps import get_current_user, get_admin_user
 from app.models.models import AuthUser
@@ -25,6 +27,22 @@ def create_business_unit(data: BusinessUnitCreate, db: Session = Depends(get_db)
     db.add(bu); db.commit(); db.refresh(bu)
     return bu
 
+@router.patch("/business-units/{bu_id}", response_model=BusinessUnitOut)
+def update_business_unit(bu_id: str, data: BusinessUnitUpdate, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
+    bu = db.query(BusinessUnit).filter(BusinessUnit.id == bu_id).first()
+    if not bu: raise HTTPException(404, "Not found")
+    for k, v in data.model_dump(exclude_none=True).items():
+        setattr(bu, k, v)
+    db.commit(); db.refresh(bu)
+    return bu
+
+@router.delete("/business-units/{bu_id}")
+def delete_business_unit(bu_id: str, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
+    bu = db.query(BusinessUnit).filter(BusinessUnit.id == bu_id).first()
+    if not bu: raise HTTPException(404, "Not found")
+    db.delete(bu); db.commit()
+    return {"message": "Deleted"}
+
 
 # ── Departments ───────────────────────────────────────────────
 @router.get("/departments", response_model=list[DepartmentOut])
@@ -40,12 +58,18 @@ def create_department(data: DepartmentCreate, db: Session = Depends(get_db), _: 
 @router.patch("/departments/{dept_id}", response_model=DepartmentOut)
 def update_department(dept_id: str, data: DepartmentUpdate, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
     dept = db.query(Department).filter(Department.id == dept_id).first()
-    if not dept:
-        raise HTTPException(404, "Department not found")
+    if not dept: raise HTTPException(404, "Not found")
     for k, v in data.model_dump(exclude_none=True).items():
         setattr(dept, k, v)
     db.commit(); db.refresh(dept)
     return dept
+
+@router.delete("/departments/{dept_id}")
+def delete_department(dept_id: str, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
+    dept = db.query(Department).filter(Department.id == dept_id).first()
+    if not dept: raise HTTPException(404, "Not found")
+    db.delete(dept); db.commit()
+    return {"message": "Deleted"}
 
 
 # ── Locations ─────────────────────────────────────────────────
@@ -59,11 +83,19 @@ def create_location(data: LocationCreate, db: Session = Depends(get_db), _: Auth
     db.add(loc); db.commit(); db.refresh(loc)
     return loc
 
+@router.patch("/locations/{loc_id}", response_model=LocationOut)
+def update_location(loc_id: str, data: LocationCreate, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
+    loc = db.query(Location).filter(Location.id == loc_id).first()
+    if not loc: raise HTTPException(404, "Not found")
+    for k, v in data.model_dump(exclude_none=True).items():
+        setattr(loc, k, v)
+    db.commit(); db.refresh(loc)
+    return loc
+
 @router.delete("/locations/{loc_id}")
 def delete_location(loc_id: str, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
     loc = db.query(Location).filter(Location.id == loc_id).first()
-    if not loc:
-        raise HTTPException(404, "Location not found")
+    if not loc: raise HTTPException(404, "Not found")
     db.delete(loc); db.commit()
     return {"message": "Deleted"}
 
@@ -78,3 +110,19 @@ def create_asset_type(data: AssetTypeCreate, db: Session = Depends(get_db), _: A
     at = AssetType(**data.model_dump())
     db.add(at); db.commit(); db.refresh(at)
     return at
+
+@router.patch("/asset-types/{type_id}", response_model=AssetTypeOut)
+def update_asset_type(type_id: str, data: AssetTypeCreate, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
+    at = db.query(AssetType).filter(AssetType.id == type_id).first()
+    if not at: raise HTTPException(404, "Not found")
+    for k, v in data.model_dump(exclude_none=True).items():
+        setattr(at, k, v)
+    db.commit(); db.refresh(at)
+    return at
+
+@router.delete("/asset-types/{type_id}")
+def delete_asset_type(type_id: str, db: Session = Depends(get_db), _: AuthUser = Depends(get_admin_user)):
+    at = db.query(AssetType).filter(AssetType.id == type_id).first()
+    if not at: raise HTTPException(404, "Not found")
+    db.delete(at); db.commit()
+    return {"message": "Deleted"}

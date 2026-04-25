@@ -85,6 +85,7 @@ export default function AssetDetailPage() {
       warranty_expiry: asset.warranty_expiry ?? '',
       location_id: asset.location_id ?? '',
       note: asset.note ?? '',
+      vendor: (asset as any).vendor ?? '',
     })
     setShowEditAsset(true)
   }
@@ -222,6 +223,7 @@ export default function AssetDetailPage() {
                 ['Thương hiệu', asset.brand],
                 ['Model', asset.model],
                 ['Serial number', asset.serial_number],
+                ['Vendor', (asset as any).vendor],
                 ['Vị trí', asset.location?.name],
                 ['Ngày mua', asset.purchase_date ? format(new Date(asset.purchase_date), 'dd/MM/yyyy') : null],
                 ['Hết bảo hành', asset.warranty_expiry ? format(new Date(asset.warranty_expiry), 'dd/MM/yyyy') : null],
@@ -505,6 +507,7 @@ export default function AssetDetailPage() {
               <Input label="Hết bảo hành" value={editForm.warranty_expiry} onChange={ef('warranty_expiry')} type="date" />
             </div>
 
+            <Input label="Vendor" value={editForm.vendor} onChange={ef('vendor')} placeholder="FPT, Synnex..." />
             <Input label="Ghi chú" value={editForm.note} onChange={ef('note')} />
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
